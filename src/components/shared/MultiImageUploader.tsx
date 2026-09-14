@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import Image from "next/image";
 import { Upload, X, Loader2, Star } from "lucide-react";
-import { uploadStorageImage } from "@/actions/upload";
+import { uploadStorageImage } from "@/lib/upload";
 import { cn } from "@/lib/utils";
 
 export interface UploadedImage {
