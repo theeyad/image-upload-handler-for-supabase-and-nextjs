@@ -2,6 +2,8 @@
 
 A simple reusable image upload component and handler for supabase and nextjs with drag and drop and keyboard accessibility features.
 
+**MAJOR UPDATE**: we added our new component MultiImageUploader, it works just as ImageUploader but with multiple images! check it out.
+
 > NOTE: all 4 demo videos in _Examples_ are from a web app I worked on so you can see all features (more in that in the _Notes on Usage_ section below). the video below is what you actually will see
 
 https://github.com/user-attachments/assets/4c2feeda-efd9-4575-9e88-109a0c7f6d1f
