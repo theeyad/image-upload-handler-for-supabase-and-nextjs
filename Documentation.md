@@ -710,6 +710,8 @@ export function MultiImageUploader({
 }
 ```
 
+---
+
 you can use it like this:
 
 ```typescript
@@ -722,6 +724,8 @@ you can use it like this:
     maxSizeInMB={5}
   />
 ```
+
+---
 
 and it will upload to supabase with `uploadStagedImages`
 
@@ -738,6 +742,3 @@ async function handleSubmit(e: React.FormEvent) {
   await saveProduct({ images: uploaded });
 }
 ```
-
-
----
