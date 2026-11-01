@@ -25,32 +25,35 @@ npm install
 npm run dev
 ```
 
+> **NOTE**: 💡 Adding to an existing project? You don't need to clone the repo! Check out the [Full Documentation](Documentation.md). it's a Copy-Paste Guide to drop the files directly into your project in 2 minutes.
+
 Now let's take a look at this
 
 ```text
 image-upload-handler-for-supabase-and-nextjs/
 ├── src/
 │   ├── actions/
-│   │   └── admin.ts                # Server action to create category and add it to Supabase
-│   ├── app/                        # Next.js App Router layout, page & global CSS
+│   │   └── admin.ts                    # Server action to create category and add it to Supabase
+│   ├── app/                            # Next.js App Router layout, page & global CSS
 │   ├── components/
 │   │   ├── shared/
-│   │   │   ├── ImageUploader.tsx   # The main UI component
-│   │   │   └── NewCategoryForm.tsx # Full Form Demo Component
-│   │   └── ui/                     # shadcn/ui components (button, field, label, toast, etc.)
+│   │   │   ├── ImageUploader.tsx       # The main UI component
+│   │   │   ├── MultiImageUploader.tsx  # NEW!!!!
+│   │   │   └── NewCategoryForm.tsx     # Full Form Demo Component
+│   │   └── ui/                         # shadcn/ui components (button, field, label, toast, etc.)
 │   ├── lib/
 │   │   ├── supabase/
-│   │   │   ├── client.ts           # Browser Supabase client helper
-│   │   │   └── server.ts           # Server Supabase client helper
+│   │   │   ├── client.ts               # Browser Supabase client helper
+│   │   │   └── server.ts               # Server Supabase client helper
 │   │   ├── validation/
 │   │   │   └── categories/
-│   │   │       └── createCat.ts    # Zod schema
-│   │   ├── upload.ts               # Storage upload helper function
-│   │   └── utils.ts                # cn() & generateUniqueId() helpers
+│   │   │       └── createCat.ts        # Zod schema
+│   │   ├── upload.ts                   # Storage upload helper function
+│   │   └── utils.ts                    # cn() & generateUniqueId() helpers
 │   └── supabase/
-│       └── storage-policies.sql    # Storage bucket & RLS SQL setup script
-├── next.config.ts                  # remotePatterns config example
-└── README.md                       # Full documentation & RHF + Zod examples
+│       └── storage-policies.sql        # Storage bucket & RLS SQL setup script
+├── next.config.ts                      # remotePatterns config example
+└── README.md                           # Full documentation & RHF + Zod examples
 ```
 
 Here we have the simplest implementation of our image upload handler, in `src/components/shared/NewCategoryForm.tsx` you will find a full form using shadcn/ui and our `ImageUploader.tsx`
@@ -75,11 +78,11 @@ https://github.com/user-attachments/assets/bd643272-1009-4959-a6ff-b61cdaedaaa4
 
 Follow these steps:
 
-1. first you need a storage bucket in supabase and RLS policies enabled on that bucket.
+1. first you need a storage bucket in supabase and RLS policies enabled on that bucket, or you can simply copy and run our ready-to-use SQL script from `src/supabase/storage-policies.sql` in your Supabase SQL Editor for the RLS step.
 
-2. then you can use the `ImageUploader.tsx` component in your project with the props: `value`, `onChange`, `onError`, `bucket`, `folder`, `disabled`. those props are connected to react hook form (RHF) and supabase bucket.
+2. then you can use the `ImageUploader.tsx` component in your project with the props: `value`, `onChange`, `onError`, `disabled`, `maxSizeInMB`. those props are connected to react hook form (RHF).
 
-3. `ImageUploader.tsx` uses the `upload.ts` helper function to upload images to supabase.
+3. Your form's `onSubmit` handler uses `uploadStorageImage` (or `uploadStagedImages`) from `lib/upload.ts` to upload files only after form validation passes.
 
 4. the `createCat.ts` schema is used in `NewCategoryForm.tsx` to validate images.
 
@@ -90,6 +93,18 @@ Follow these steps:
 7. `app/page.tsx` uses `NewCategoryForm.tsx` component to display a full form using shadcn/ui and our `ImageUploader.tsx`.
 
 8. `next.config.ts` remotePatterns config example to configure remote patterns for images, this is needed for next `<Image>` component so it can display the preview of uploaded image.
+
+## Benifits
+
+Why should you use this over any other Supabase uploader?
+
+1. Instant 0ms Previews: Local browser previews with zero network latency.
+
+2. Zero Storage Bloat: Files upload to Supabase only when the form is submitted. If a user cancels or validation fails, zero orphaned files pollute your storage bucket.
+
+3. Automatic Memory Cleanup: Auto-revokes object URLs to prevent browser memory leaks.
+
+4. and ofcourse cause it's easy to use :)
 
 > To use the `ImageUploader` component and understand the whole flow see [Full Documentation](Documentation.md).
 

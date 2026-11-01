@@ -1,14 +1,18 @@
-// remeber that RHF needs a "use client"
+// remember that RHF needs a "use client"
 // toast and field are from shadcn/ui
 
 "use client";
 
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
-import type { FieldValues } from "react-hook-form";
 import { createCategory } from "@/actions/admin";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { createCatSchema } from "@/lib/validation/categories/createCat";
+import {
+  createCatSchema,
+  type CreateCatInput,
+} from "@/lib/validation/categories/createCat";
 import { ImageUploader } from "@/components/shared/ImageUploader";
+import { uploadStorageImage } from "@/lib/upload";
 import {
   Field,
   FieldError,
@@ -26,7 +30,7 @@ export default function NewCategoryForm() {
     formState: { errors, isSubmitting },
     setError,
     reset,
-  } = useForm({
+  } = useForm<CreateCatInput>({
     resolver: zodResolver(createCatSchema),
     defaultValues: {
       cat_name: "",
@@ -35,13 +39,43 @@ export default function NewCategoryForm() {
     },
   });
 
-  async function formSubmitHandler(values: FieldValues) {
-    const result = await createCategory(values);
+  // Explicitly register cat_img field with React Hook Form
+  useEffect(() => {
+    register("cat_img");
+  }, [register]);
+
+  async function formSubmitHandler(values: CreateCatInput) {
+    let finalImageUrl =
+      typeof values.cat_img === "string" ? values.cat_img : "";
+
+    // Deferred Upload: Only upload the staged File to Supabase upon successful form submission
+    if (values.cat_img instanceof File) {
+
+      // Bucket name and folder name
+      const uploadResult = await uploadStorageImage(values.cat_img, "uploads", "images");
+
+      if (uploadResult.error) {
+        setError("cat_img", {
+          message: uploadResult.error,
+        });
+        return;
+      }
+
+      finalImageUrl = uploadResult.publicUrl || "";
+    }
+
+    // Submit validated data with Supabase public URL to Server Action
+    const result = await createCategory({
+      ...values,
+      cat_img: finalImageUrl,
+    });
+
     if (result?.error) {
       setError("root", {
         message: result.error,
       });
     }
+
     if (result?.success) {
       toast.add({
         title: "Category created",
@@ -98,17 +132,10 @@ export default function NewCategoryForm() {
                 <FieldLabel>Category Image</FieldLabel>
               </div>
 
-              {/* Hidden RHF input field registered with zod schema */}
-              <input type="hidden" {...register("cat_img")} />
-
               <ImageUploader
                 value={watch("cat_img")}
-                onChange={(url) =>
-                  setValue("cat_img", url, { shouldValidate: true })
-                }
+                onChange={(file) => setValue("cat_img", file ?? "", { shouldValidate: true })}
                 onError={(message) => setError("cat_img", { message })}
-                bucket="uploads"
-                folder="images"
                 disabled={isSubmitting}
               />
 

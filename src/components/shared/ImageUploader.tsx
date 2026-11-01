@@ -1,56 +1,73 @@
 "use client";
 
-import { useState, useRef } from "react";
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Image from "next/image";
-import { Upload, X, Loader2 } from "lucide-react";
-import { uploadStorageImage } from "@/lib/upload";
+import { Upload, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface ImageUploaderProps {
-  value?: string;
-  onChange: (url: string) => void;
+export interface ImageUploaderProps {
+  value?: File | string | null;
+  onChange: (file: File | string | null) => void;
   onError?: (message: string) => void;
-  bucket?: string;
-  folder?: string;
   disabled?: boolean;
+  maxSizeInMB?: number;
 }
-
 export function ImageUploader({
-  value = "",
+  value,
   onChange,
   onError,
-  bucket = "uploads",
-  folder = "images",
   disabled = false,
+  maxSizeInMB = 5,
 }: ImageUploaderProps) {
-  const [uploading, setUploading] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  async function processFile(file: File) {
+  const [isDragging, setIsDragging] = useState(false);
+  const [localPreview, setLocalPreview] = useState<string>("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const objectUrlRef = useRef<string | null>(null);
+
+  // Compute preview URL: prioritize localPreview for File, or string value for remote URL
+  const previewUrl =
+    !value
+      ? ""
+      : value instanceof File
+        ? localPreview
+        : typeof value === "string"
+          ? value
+          : "";
+
+  // Clean up object URL when component unmounts
+  useEffect(() => {
+    return () => {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
+    };
+  }, []);
+
+  function processFile(file: File) {
     if (!file.type.startsWith("image/")) {
       onError?.("Please select a valid image file");
       return;
     }
 
-    setUploading(true);
-    try {
-      const result = await uploadStorageImage(file, bucket, folder);
-
-      if (result.error) {
-        onError?.(result.error);
-        return;
-      }
-
-      if (result.publicUrl) {
-        onChange(result.publicUrl);
-      }
-    } catch {
-      onError?.("Failed to upload image");
-    } finally {
-      setUploading(false);
+    if (file.size > maxSizeInMB * 1024 * 1024) {
+      onError?.(`Image size must be less than ${maxSizeInMB}MB`);
+      return;
     }
+
+    // Revoke previous object URL if one exists
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+    }
+
+    // Create 0ms instant preview locally without network requests
+    const url = URL.createObjectURL(file);
+    objectUrlRef.current = url;
+    setLocalPreview(url);
+
+    // Stage raw File locally in form state
+    onChange(file);
   }
 
   function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -63,7 +80,7 @@ export function ImageUploader({
   function handleDragOver(e: React.DragEvent<HTMLLabelElement>) {
     e.preventDefault();
     e.stopPropagation();
-    if (!disabled && !uploading) {
+    if (!disabled) {
       setIsDragging(true);
     }
   }
@@ -79,7 +96,7 @@ export function ImageUploader({
     e.stopPropagation();
     setIsDragging(false);
 
-    if (disabled || uploading) return;
+    if (disabled) return;
 
     const file = e.dataTransfer.files?.[0];
     if (file) {
@@ -88,30 +105,43 @@ export function ImageUploader({
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLLabelElement>) {
-    if ((e.key === "Enter" || e.key === " ") && !disabled && !uploading) {
+    if ((e.key === "Enter" || e.key === " ") && !disabled) {
       e.preventDefault();
       fileInputRef.current?.click();
     }
   }
 
   function handleRemoveImage() {
-    onChange("");
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
+    setLocalPreview("");
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+    onChange(null);
   }
 
   return (
     <div>
-      {value ? (
+      {previewUrl ? (
         <div className="relative w-full h-36 rounded-lg overflow-hidden border border-input shadow-sm">
           <Image
-            src={value}
-            alt="Uploaded Preview"
+            src={previewUrl}
+            alt="Image preview"
             fill
             className="object-cover"
+            unoptimized={
+              previewUrl.startsWith("blob:") || previewUrl.startsWith("data:")
+            }
           />
           <button
             type="button"
             onClick={handleRemoveImage}
             disabled={disabled}
+            aria-label="Remove image"
             className="absolute top-2 right-2 bg-black/70 text-white p-1 rounded-full hover:bg-black transition-colors disabled:opacity-50 cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -119,14 +149,14 @@ export function ImageUploader({
         </div>
       ) : (
         <label
-          tabIndex={disabled || uploading ? -1 : 0}
+          tabIndex={disabled ? -1 : 0}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           onKeyDown={handleKeyDown}
           className={cn(
             "flex flex-col items-center justify-center w-full h-36 border-2 border-dashed rounded-lg transition-all duration-150 outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-            disabled || uploading
+            disabled
               ? "cursor-not-allowed opacity-60 pointer-events-none"
               : "cursor-pointer",
             isDragging
@@ -135,38 +165,27 @@ export function ImageUploader({
           )}
         >
           <div className="flex flex-col items-center justify-center pt-5 pb-6">
-            {uploading ? (
-              <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                <span>Uploading image to Supabase...</span>
-              </div>
-            ) : (
-              <>
-                <Upload
-                  className={cn(
-                    "w-7 h-7 mb-2 transition-transform duration-200",
-                    isDragging
-                      ? "scale-110 text-primary"
-                      : "text-muted-foreground",
-                  )}
-                />
-                <p className="text-sm text-muted-foreground">
-                  <span className="font-semibold text-foreground">
-                    Click to upload
-                  </span>{" "}
-                  or drag and drop
-                </p>
-                <p className="text-xs text-muted-foreground/70 mt-1">
-                  PNG, JPG, WebP, GIF, or SVG (max 5MB)
-                </p>
-              </>
-            )}
+            <Upload
+              className={cn(
+                "w-7 h-7 mb-2 transition-transform duration-200",
+                isDragging ? "scale-110 text-primary" : "text-muted-foreground",
+              )}
+            />
+            <p className="text-sm text-muted-foreground">
+              <span className="font-semibold text-foreground">
+                Click to upload
+              </span>{" "}
+              or drag and drop
+            </p>
+            <p className="text-xs text-muted-foreground/70 mt-1">
+              PNG, JPG, WebP, GIF, or SVG (max {maxSizeInMB}MB)
+            </p>
           </div>
           <input
             ref={fileInputRef}
             type="file"
             accept="image/*"
-            disabled={disabled || uploading}
+            disabled={disabled}
             onChange={handleImageUpload}
             className="hidden"
           />
